@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文法提示詞</title>
+  <style>
+    :root {
+      --ink: #1c1915;
+      --muted: #6b645b;
+      --line: #e4dccf;
+      --paper: #f7f3eb;
+      --card: #fffdf8;
+      --accent: #8c3a2f;
+      --accent-ink: #fffaf6;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
+      line-height: 1.5;
+    }
+
+    main {
+      width: min(880px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 40px 0 64px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+      font-weight: 650;
+      letter-spacing: -0.03em;
+    }
+
+    .lead {
+      margin: 0 0 24px;
+      color: var(--muted);
+    }
+
+    form {
+      display: grid;
+      gap: 16px;
+      padding: 20px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    label {
+      display: grid;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .field[hidden] { display: none; }
+
+    textarea,
+    select {
+      width: 100%;
+      padding: 12px 14px;
+      color: var(--ink);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font: inherit;
+      font-weight: 400;
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 400;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: flex-end;
+      margin: 20px 0 12px;
+    }
+
+    button {
+      padding: 8px 14px;
+      color: var(--accent-ink);
+      background: var(--accent);
+      border: 0;
+      border-radius: 999px;
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      color: var(--muted);
+      background: #e7e1d6;
+      cursor: not-allowed;
+    }
+
+    #cards {
+      display: grid;
+      gap: 14px;
+    }
+
+    article {
+      padding: 18px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+
+    article h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    article .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    pre {
+      margin: 12px 0 0;
+      padding: 14px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #f3eee4;
+      border-radius: 10px;
+      font-family: ui-monospace, "Cascadia Code", "Noto Sans TC", monospace;
+      font-size: 14px;
+    }
+
+    @media (max-width: 640px) {
+      .row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>文法提示詞</h1>
+    <p class="lead">貼上句子，複製下面的提示詞給 AI，用它來學文法。</p>
+    <form>
+      <label>
+        句子
+        <textarea id="sentence" placeholder="貼上你想學的句子"></textarea>
+      </label>
+      <div class="row">
+        <label>
+          語言
+          <select id="language"></select>
+        </label>
+        <label id="levelField" class="field">
+          等級
+          <select id="level"></select>
+          <span class="hint">只影響會附例句的區塊</span>
+        </label>
+      </div>
+    </form>
+    <div class="toolbar">
+      <button id="copyAll" type="button" disabled>全部複製</button>
+    </div>
+    <section id="cards"></section>
+  </main>
+  <script>
+    const languages = [
+      { id: "en", label: "英文" },
+      { id: "ja", label: "日文" },
+      { id: "ko", label: "韓文" },
+      { id: "fr", label: "法文" },
+      { id: "de", label: "德文" },
+      { id: "es", label: "西班牙文" },
+      { id: "zh", label: "中文" },
+    ];
+
+    const levelsByLanguage = {
+      en: [
+        { id: "A1", label: "CEFR A1" },
+        { id: "A2", label: "CEFR A2" },
+        { id: "B1", label: "CEFR B1" },
+        { id: "B2", label: "CEFR B2" },
+        { id: "C1", label: "CEFR C1" },
+        { id: "C2", label: "CEFR C2" },
+      ],
+      ja: [
+        { id: "N5", label: "JLPT N5" },
+        { id: "N4", label: "JLPT N4" },
+        { id: "N3", label: "JLPT N3" },
+        { id: "N2", label: "JLPT N2" },
+        { id: "N1", label: "JLPT N1" },
+      ],
+      ko: [
+        { id: "1", label: "TOPIK 1級" },
+        { id: "2", label: "TOPIK 2級" },
+        { id: "3", label: "TOPIK 3級" },
+        { id: "4", label: "TOPIK 4級" },
+        { id: "5", label: "TOPIK 5級" },
+        { id: "6", label: "TOPIK 6級" },
+      ],
+    };
+
+    const blocks = [
+      {
+        title: "整句翻譯",
+        includeExamples: false,
+        instruction: "請說明整句的意思，並標出和原句的對應關係。不要另外造例句。",
+      },
+      {
+        title: "逐詞拆解",
+        includeExamples: false,
+        instruction: "請逐詞說明詞性、意思，以及在句中的角色。不要另外造例句。",
+      },
+      {
+        title: "文法重點",
+        includeExamples: true,
+        instruction: "請說明這句的文法重點，包含時態、句型，以及為什麼這樣用。\n請附上 2 句說明例句。",
+      },
+      {
+        title: "換句話說",
+        includeExamples: true,
+        instruction: "請給一個更簡單的說法，和一個程度稍高的說法。\n兩種說法各附 1 句例句。",
+      },
+      {
+        title: "練習",
+        includeExamples: true,
+        instruction: "請用同一句型出 2 題練習，先不要給答案。",
+      },
+    ];
+
+    const sentenceInput = document.querySelector("#sentence");
+    const languageSelect = document.querySelector("#language");
+    const levelField = document.querySelector("#levelField");
+    const levelSelect = document.querySelector("#level");
+    const cardsEl = document.querySelector("#cards");
+    const copyAll = document.querySelector("#copyAll");
+
+    // 畫出一張卡片。沒有提示詞時，複製按鈕停用。
+    // title = "文法重點"
+    // body = "你是文法老師。請用繁體中文回答。\n\n語言：日文\n句子：駅まで歩いて行きます。\n\n請說明這句的文法重點，包含時態、句型，以及為什麼這樣用。\n請附上 2 句說明例句。\n例句的單字要落在 JLPT N3，不要超出這個等級。"
+    // prompt = "你是文法老師。請用繁體中文回答。\n\n語言：日文\n句子：駅まで歩いて行きます。..."
+    function cardElement(title, body, prompt) {
+      const card = document.createElement("article");
+      const head = document.createElement("div");
+      head.className = "card-head";
+      const heading = document.createElement("h2");
+      heading.textContent = title;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "複製";
+      if (!prompt) {
+        button.disabled = true;
+      } else {
+        button.dataset.prompt = prompt;
+      }
+      head.append(heading, button);
+      const pre = document.createElement("pre");
+      pre.textContent = body;
+      card.append(head, pre);
+      return card;
+    }
+
+    function render() {
+      const sentence = sentenceInput.value.trim();
+      const languageLabel = languageSelect.selectedOptions[0].textContent;
+      cardsEl.replaceChildren();
+
+      // 句子是空的就停，不組提示詞。
+      // sentence = ""
+      if (!sentence) {
+        for (const block of blocks) {
+          cardsEl.append(cardElement(block.title, "請先輸入句子", ""));
+        }
+        copyAll.textContent = "全部複製";
+        copyAll.disabled = true;
+        return;
+      }
+
+      const levelLabel = levelField.hidden ? "" : levelSelect.selectedOptions[0].textContent;
+      const header = `你是文法老師。請用繁體中文回答。\n\n語言：${languageLabel}\n句子：${sentence}`;
+
+      // 組出每一塊要複製的提示詞。
+      // sentence = "駅まで歩いて行きます。"
+      // languageLabel = "日文"
+      // levelLabel = "JLPT N3"
+      // block.title = "文法重點"
+      for (const block of blocks) {
+        let instruction = block.instruction;
+        if (block.includeExamples && levelLabel) {
+          instruction += `\n例句的單字要落在 ${levelLabel}，不要超出這個等級。`;
+        }
+        const text = `${header}\n\n${instruction}`;
+        cardsEl.append(cardElement(block.title, text, text));
+      }
+      copyAll.textContent = "全部複製";
+      copyAll.disabled = false;
+    }
+
+    function syncLevels() {
+      const languageId = languageSelect.value;
+      const levels = levelsByLanguage[languageId];
+
+      // 這個語言沒有等級，藏起欄位。
+      // languageId = "fr"
+      // levels = undefined
+      if (!levels) {
+        levelField.hidden = true;
+        render();
+        return;
+      }
+
+      // 換成這個語言的等級，並選最容易的一級。
+      // languageId = "ja"
+      // levels = [{ id: "N5", label: "JLPT N5" }]
+      levelSelect.replaceChildren();
+      for (const level of levels) {
+        const option = document.createElement("option");
+        option.value = level.id;
+        option.textContent = level.label;
+        levelSelect.append(option);
+      }
+      levelField.hidden = false;
+      render();
+    }
+
+    // 把提示詞放進剪貼簿，並改按鈕文字。
+    // button.dataset.prompt = "你是文法老師。請用繁體中文回答。\n\n語言：日文\n句子：駅まで歩いて行きます。..."
+    // button.textContent = "複製"
+    function markCopied(button) {
+      navigator.clipboard.writeText(button.dataset.prompt).then(() => {
+        button.textContent = "已複製";
+      }, () => {
+        button.textContent = "複製失敗";
+      });
+    }
+
+    // 填上語言選項。
+    // language = { id: "en", label: "英文" }
+    for (const language of languages) {
+      const option = document.createElement("option");
+      option.value = language.id;
+      option.textContent = language.label;
+      languageSelect.append(option);
+    }
+
+    languageSelect.addEventListener("change", syncLevels);
+    levelSelect.addEventListener("change", render);
+    sentenceInput.addEventListener("input", render);
+
+    cardsEl.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button || button.disabled) {
+        return;
+      }
+      // 複製這張卡片的提示詞。
+      // button.dataset.prompt = "你是文法老師。請用繁體中文回答。\n\n語言：日文\n句子：駅まで歩いて行きます。..."
+      markCopied(button);
+    });
+
+    copyAll.addEventListener("click", () => {
+      // 把五段提示詞用空行接起來。
+      // parts = ["你是文法老師。請用繁體中文回答。\n\n語言：日文\n句子：駅まで歩いて行きます。\n\n請說明整句的意思，並標出和原句的對應關係。不要另外造例句。"]
+      const parts = [...cardsEl.querySelectorAll("button")].map((button) => button.dataset.prompt);
+      copyAll.dataset.prompt = parts.join("\n\n");
+      markCopied(copyAll);
+    });
+
+    syncLevels();
+  </script>
+</body>
+</html>
