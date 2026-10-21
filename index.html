@@ -55,7 +55,7 @@
 
     .row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 16px;
     }
 
@@ -157,13 +157,20 @@
 <body>
   <main>
     <h1>文法提示詞</h1>
-    <p class="lead">貼上句子，複製下面的提示詞給 AI，用它來學文法。</p>
+    <p class="lead">貼上句子或文法，複製下面的提示詞給 AI，用它來學。</p>
     <form>
       <label>
-        句子
-        <textarea id="sentence" placeholder="貼上你想學的句子"></textarea>
+        內容
+        <textarea id="content" placeholder="貼上句子或文法"></textarea>
       </label>
       <div class="row">
+        <label>
+          類型
+          <select id="kind">
+            <option value="sentence">句子</option>
+            <option value="grammar">文法</option>
+          </select>
+        </label>
         <label>
           語言
           <select id="language"></select>
@@ -217,35 +224,65 @@
       ],
     };
 
-    const blocks = [
-      {
-        title: "整句翻譯",
-        includeExamples: false,
-        instruction: "請說明整句的意思，並標出和原句的對應關係。不要另外造例句。",
-      },
-      {
-        title: "逐詞拆解",
-        includeExamples: false,
-        instruction: "請逐詞說明詞性、意思，以及在句中的角色。不要另外造例句。",
-      },
-      {
-        title: "文法重點",
-        includeExamples: true,
-        instruction: "請說明這句的文法重點，包含時態、句型，以及為什麼這樣用。\n請附上 2 句說明例句。",
-      },
-      {
-        title: "換句話說",
-        includeExamples: true,
-        instruction: "請給一個更簡單的說法，和一個程度稍高的說法。\n兩種說法各附 1 句例句。",
-      },
-      {
-        title: "練習",
-        includeExamples: true,
-        instruction: "請用同一句型出 2 題練習，先不要給答案。",
-      },
-    ];
+    const blocksByKind = {
+      sentence: [
+        {
+          title: "整句翻譯",
+          includeExamples: false,
+          instruction: "請說明整句的意思，並標出和原句的對應關係。不要另外造例句。",
+        },
+        {
+          title: "逐詞拆解",
+          includeExamples: false,
+          instruction: "請逐詞說明詞性、意思，以及在句中的角色。不要另外造例句。",
+        },
+        {
+          title: "文法重點",
+          includeExamples: true,
+          instruction: "請說明這句的文法重點，包含時態、句型，以及為什麼這樣用。\n請附上 2 句說明例句。",
+        },
+        {
+          title: "換句話說",
+          includeExamples: true,
+          instruction: "請給一個更簡單的說法，和一個程度稍高的說法。\n兩種說法各附 1 句例句。",
+        },
+        {
+          title: "練習",
+          includeExamples: true,
+          instruction: "請用同一句型出 2 題練習，先不要給答案。",
+        },
+      ],
+      grammar: [
+        {
+          title: "意思與用法",
+          includeExamples: false,
+          instruction: "請說明這個文法的意思和使用時機。不要另外造例句。",
+        },
+        {
+          title: "接續方式",
+          includeExamples: false,
+          instruction: "請說明這個文法前面和後面要接什麼，以及詞形怎麼變。不要另外造例句。",
+        },
+        {
+          title: "例句",
+          includeExamples: true,
+          instruction: "請附上 2 句說明例句，並寫出繁體中文意思。",
+        },
+        {
+          title: "常見錯誤",
+          includeExamples: true,
+          instruction: "請指出 2 個使用這個文法時的常見錯誤，並各給 1 句改正後的例句。",
+        },
+        {
+          title: "練習",
+          includeExamples: true,
+          instruction: "請用這個文法出 2 題練習，先不要給答案。",
+        },
+      ],
+    };
 
-    const sentenceInput = document.querySelector("#sentence");
+    const contentInput = document.querySelector("#content");
+    const kindSelect = document.querySelector("#kind");
     const languageSelect = document.querySelector("#language");
     const levelField = document.querySelector("#levelField");
     const levelSelect = document.querySelector("#level");
@@ -278,15 +315,17 @@
     }
 
     function render() {
-      const sentence = sentenceInput.value.trim();
+      const content = contentInput.value.trim();
+      const kind = kindSelect.value;
+      const blocks = blocksByKind[kind];
       const languageLabel = languageSelect.selectedOptions[0].textContent;
       cardsEl.replaceChildren();
 
-      // 句子是空的就停，不組提示詞。
-      // sentence = ""
-      if (!sentence) {
+      // 內容是空的就停，不組提示詞。
+      // content = ""
+      if (!content) {
         for (const block of blocks) {
-          cardsEl.append(cardElement(block.title, "請先輸入句子", ""));
+          cardsEl.append(cardElement(block.title, "請先輸入內容", ""));
         }
         copyAll.textContent = "全部複製";
         copyAll.disabled = true;
@@ -294,13 +333,15 @@
       }
 
       const levelLabel = levelField.hidden ? "" : levelSelect.selectedOptions[0].textContent;
-      const header = `你是文法老師。請用繁體中文回答。\n\n語言：${languageLabel}\n句子：${sentence}`;
+      const kindLabel = kind === "grammar" ? "文法" : "句子";
+      const header = `你是文法老師。請用繁體中文回答。\n\n語言：${languageLabel}\n${kindLabel}：${content}`;
 
       // 組出每一塊要複製的提示詞。
-      // sentence = "駅まで歩いて行きます。"
+      // content = "てしまう"
+      // kindLabel = "文法"
       // languageLabel = "日文"
       // levelLabel = "JLPT N3"
-      // block.title = "文法重點"
+      // block.title = "意思與用法"
       for (const block of blocks) {
         let instruction = block.instruction;
         if (block.includeExamples && levelLabel) {
@@ -362,7 +403,8 @@
 
     languageSelect.addEventListener("change", syncLevels);
     levelSelect.addEventListener("change", render);
-    sentenceInput.addEventListener("input", render);
+    kindSelect.addEventListener("change", render);
+    contentInput.addEventListener("input", render);
 
     cardsEl.addEventListener("click", (event) => {
       const button = event.target.closest("button");
