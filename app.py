@@ -1,13 +1,14 @@
 import os
 
-from flask import Flask, render_template
+from flask import Flask, send_from_directory
 
 app = Flask(__name__)
+ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
 @app.get("/")
 def index():
-    return render_template("index.html")
+    return send_from_directory(ROOT, "index.html")
 
 
 if __name__ == "__main__":
