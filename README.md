@@ -1,3 +1,13 @@
+---
+title: Grammar Learning
+emoji: 📝
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+app_port: 7860
+---
+
 # 文法提示詞
 
 輸入一句各國語言的句子，頁面會產生多段提示詞。複製後貼給 AI，用來學文法。
