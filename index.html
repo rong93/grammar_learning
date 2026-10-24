@@ -66,11 +66,35 @@
       font-weight: 650;
     }
 
-    .field[hidden] { display: none; }
+    .field {
+      display: grid;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 650;
+    }
 
-    textarea,
-    select {
+    .choices {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .choices button {
+      color: var(--ink);
+      background: #fff;
+      border: 1px solid var(--line);
+      font-weight: 400;
+    }
+
+    .choices button[aria-pressed="true"] {
+      color: var(--accent-ink);
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    textarea {
       width: 100%;
+      min-height: 120px;
       padding: 12px 14px;
       color: var(--ink);
       background: #fff;
@@ -78,10 +102,6 @@
       border-radius: 10px;
       font: inherit;
       font-weight: 400;
-    }
-
-    textarea {
-      min-height: 120px;
       resize: vertical;
     }
 
@@ -164,22 +184,19 @@
         <textarea id="content" placeholder="貼上句子或文法"></textarea>
       </label>
       <div class="row">
-        <label>
+        <div class="field">
           類型
-          <select id="kind">
-            <option value="sentence">句子</option>
-            <option value="grammar">文法</option>
-          </select>
-        </label>
-        <label>
+          <div id="kindChoices" class="choices"></div>
+        </div>
+        <div class="field">
           語言
-          <select id="language"></select>
-        </label>
-        <label id="levelField" class="field">
-          等級
-          <select id="level"></select>
-          <span class="hint">只影響會附例句的區塊</span>
-        </label>
+          <div id="languageChoices" class="choices"></div>
+        </div>
+      </div>
+      <div class="field">
+        等級
+        <div id="levelChoices" class="choices"></div>
+        <span class="hint">只影響會附例句的區塊</span>
       </div>
     </form>
     <div class="toolbar">
@@ -188,14 +205,15 @@
     <section id="cards"></section>
   </main>
   <script>
+    const kinds = [
+      { id: "sentence", label: "句子" },
+      { id: "grammar", label: "文法" },
+    ];
+
     const languages = [
       { id: "en", label: "英文" },
       { id: "ja", label: "日文" },
       { id: "ko", label: "韓文" },
-      { id: "fr", label: "法文" },
-      { id: "de", label: "德文" },
-      { id: "es", label: "西班牙文" },
-      { id: "zh", label: "中文" },
     ];
 
     const levelsByLanguage = {
@@ -282,12 +300,44 @@
     };
 
     const contentInput = document.querySelector("#content");
-    const kindSelect = document.querySelector("#kind");
-    const languageSelect = document.querySelector("#language");
-    const levelField = document.querySelector("#levelField");
-    const levelSelect = document.querySelector("#level");
+    const kindChoices = document.querySelector("#kindChoices");
+    const languageChoices = document.querySelector("#languageChoices");
+    const levelChoices = document.querySelector("#levelChoices");
     const cardsEl = document.querySelector("#cards");
     const copyAll = document.querySelector("#copyAll");
+
+    // 畫出一個可點選的選項。
+    // item = { id: "ja", label: "日文" }
+    function choiceButton(item) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.value = item.id;
+      button.textContent = item.label;
+      button.setAttribute("aria-pressed", "false");
+      return button;
+    }
+
+    // 同一組只留下這顆是選中的。
+    // button.dataset.value = "ja"
+    function selectChoice(group, button) {
+      for (const choice of group.querySelectorAll("button")) {
+        choice.setAttribute("aria-pressed", String(choice === button));
+      }
+    }
+
+    function selectedChoice(group) {
+      return group.querySelector('[aria-pressed="true"]');
+    }
+
+    // 換成這一組選項，並選第一個。
+    // items = [{ id: "N5", label: "JLPT N5" }]
+    function fillChoices(group, items) {
+      group.replaceChildren();
+      for (const item of items) {
+        group.append(choiceButton(item));
+      }
+      selectChoice(group, group.querySelector("button"));
+    }
 
     // 畫出一張卡片。沒有提示詞時，複製按鈕停用。
     // title = "文法重點"
@@ -316,9 +366,9 @@
 
     function render() {
       const content = contentInput.value.trim();
-      const kind = kindSelect.value;
+      const kind = selectedChoice(kindChoices).dataset.value;
       const blocks = blocksByKind[kind];
-      const languageLabel = languageSelect.selectedOptions[0].textContent;
+      const languageLabel = selectedChoice(languageChoices).textContent;
       cardsEl.replaceChildren();
 
       // 內容是空的就停，不組提示詞。
@@ -332,7 +382,7 @@
         return;
       }
 
-      const levelLabel = levelField.hidden ? "" : levelSelect.selectedOptions[0].textContent;
+      const levelLabel = selectedChoice(levelChoices).textContent;
       const kindLabel = kind === "grammar" ? "文法" : "句子";
       const header = `你是文法老師。請用繁體中文回答。\n\n語言：${languageLabel}\n${kindLabel}：${content}`;
 
@@ -355,29 +405,12 @@
     }
 
     function syncLevels() {
-      const languageId = languageSelect.value;
-      const levels = levelsByLanguage[languageId];
-
-      // 這個語言沒有等級，藏起欄位。
-      // languageId = "fr"
-      // levels = undefined
-      if (!levels) {
-        levelField.hidden = true;
-        render();
-        return;
-      }
+      const languageId = selectedChoice(languageChoices).dataset.value;
 
       // 換成這個語言的等級，並選最容易的一級。
       // languageId = "ja"
       // levels = [{ id: "N5", label: "JLPT N5" }]
-      levelSelect.replaceChildren();
-      for (const level of levels) {
-        const option = document.createElement("option");
-        option.value = level.id;
-        option.textContent = level.label;
-        levelSelect.append(option);
-      }
-      levelField.hidden = false;
+      fillChoices(levelChoices, levelsByLanguage[languageId]);
       render();
     }
 
@@ -392,18 +425,24 @@
       });
     }
 
-    // 填上語言選項。
-    // language = { id: "en", label: "英文" }
-    for (const language of languages) {
-      const option = document.createElement("option");
-      option.value = language.id;
-      option.textContent = language.label;
-      languageSelect.append(option);
+    // 點選項時，同一組只留下被點的那顆。
+    // button.dataset.value = "ja"
+    function bindChoices(group, onSelect) {
+      group.addEventListener("click", (event) => {
+        const button = event.target.closest("button");
+        if (!button) {
+          return;
+        }
+        selectChoice(group, button);
+        onSelect();
+      });
     }
 
-    languageSelect.addEventListener("change", syncLevels);
-    levelSelect.addEventListener("change", render);
-    kindSelect.addEventListener("change", render);
+    fillChoices(kindChoices, kinds);
+    fillChoices(languageChoices, languages);
+    bindChoices(kindChoices, render);
+    bindChoices(languageChoices, syncLevels);
+    bindChoices(levelChoices, render);
     contentInput.addEventListener("input", render);
 
     cardsEl.addEventListener("click", (event) => {
